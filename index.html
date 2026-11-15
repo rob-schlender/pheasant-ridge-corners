@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pheasant Ridge Corners</title>
+<style>
+  :root {
+    --bg: #f3f5f1; --card: #ffffff; --fg: #1c2419; --muted: #5d6b58; --line: #dde3d9;
+    --good: #2f7d32; --ok: #b7791f; --bad: #b3261e; --accent: #3f6b3a; --accent-ink: #ffffff;
+    --sel: #e3eedf;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141a13; --card: #1f281d; --fg: #eef3ec; --muted: #9fae99; --line: #2f3a2c;
+            --good: #6fcf73; --ok: #f0b44c; --bad: #ff8a80; --accent: #8fc488; --accent-ink: #141a13;
+            --sel: #2b3a28; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 520px; margin: 0 auto;
+    padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+             max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    display: flex; flex-direction: column; gap: 14px; }
+  h1 { font-size: 1.25rem; margin: 0; color: var(--muted); font-weight: 600; }
+  h2 { font-size: 1rem; margin: 8px 0 0; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .card { background: var(--card); border-radius: 16px; padding: 18px; }
+  .label { font-size: 0.9rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .num { font-size: clamp(1.9rem, 9vw, 2.6rem); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pair { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  #acc { font-size: 1.25rem; font-weight: 700; margin-top: 10px; }
+  .good { color: var(--good); } .ok { color: var(--ok); } .bad { color: var(--bad); }
+  button { font: inherit; font-size: 1.15rem; font-weight: 700; padding: 16px; border: 0;
+    border-radius: 14px; background: var(--accent); color: var(--accent-ink); width: 100%; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--accent); border: 2px solid var(--accent); }
+  button:focus-visible, .corner:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
+  #msg { font-size: 1rem; color: var(--muted); min-height: 1.3em; text-align: center; }
+
+  /* Target / guidance card */
+  #target[hidden] { display: none; }
+  #tName { font-size: 1.35rem; font-weight: 700; line-height: 1.25; }
+  #tCoords { font-variant-numeric: tabular-nums; color: var(--muted); margin-top: 4px; font-size: 1rem; }
+  .guide { display: flex; align-items: center; gap: 18px; margin-top: 14px; }
+  #arrowWrap { width: 120px; height: 120px; flex: none; border-radius: 50%; background: var(--sel);
+    display: grid; place-items: center; }
+  #arrow { width: 84px; height: 84px; transition: transform .25s ease-out; }
+  #arrow path { fill: var(--accent); }
+  #dist { font-size: clamp(2.4rem, 12vw, 3.2rem); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  #dir { font-size: 1.2rem; font-weight: 600; margin-top: 6px; }
+  #hint { font-size: 1.05rem; margin-top: 12px; font-weight: 600; }
+  #compassBtn { margin-top: 12px; }
+
+  /* Corner list */
+  .lot { display: flex; flex-direction: column; gap: 8px; }
+  .corner { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    background: var(--card); border: 2px solid transparent; border-radius: 12px; padding: 14px 16px;
+    font: inherit; color: var(--fg); text-align: left; width: 100%; cursor: pointer; }
+  .corner .cn { font-size: 1.1rem; font-weight: 600; min-width: 0; }
+  .corner .cd { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
+  .corner.selected { border-color: var(--accent); background: var(--sel); }
+  .corner.nearest .cd { color: var(--good); }
+  small { color: var(--muted); font-size: 0.95rem; line-height: 1.45; }
+  @media (prefers-reduced-motion: reduce) { #arrow { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pheasant Ridge Corners</h1>
+
+  <div class="card">
+    <div class="pair">
+      <div><div class="label">You are at · Latitude</div><div class="num" id="lat">—</div></div>
+      <div><div class="label">Longitude</div><div class="num" id="lon">—</div></div>
+    </div>
+    <div id="acc">Waiting for GPS…</div>
+  </div>
+
+  <div class="card" id="target" hidden>
+    <div class="label">Finding</div>
+    <div id="tName"></div>
+    <div id="tCoords"></div>
+    <div class="guide">
+      <div id="arrowWrap" aria-hidden="true">
+        <svg id="arrow" viewBox="0 0 100 100"><path d="M50 4 L82 88 L50 70 L18 88 Z"/></svg>
+      </div>
+      <div>
+        <div id="dist">—</div>
+        <div id="dir"></div>
+      </div>
+    </div>
+    <div id="hint"></div>
+    <button id="compassBtn" class="ghost" type="button">Turn on compass arrow</button>
+  </div>
+
+  <button id="copy" type="button">Copy my coordinates</button>
+  <div id="msg" aria-live="polite"></div>
+
+  <small>Tap the corner you're looking for. Closest corners are listed first in each lot.
+  Corner pins are within about 10–20 ft, so when you get close, look around for the stake.</small>
+
+  <div id="list"></div>
+</main>
+<script>
+const CORNERS = [
+  ["Lot 19","NW corner",47.7542239,-122.0980647],
+  ["Lot 19","NE corner",47.7542491,-122.0973420],
+  ["Lot 19","East bend",47.7538692,-122.0970876],
+  ["Lot 19","South tip",47.7536726,-122.0970533],
+  ["Lot 19","SW bend",47.7538740,-122.0976892],
+  ["Lot 19","West bend",47.7540569,-122.0978125],
+  ["Lot 2","NW corner",47.7534803,-122.0968430],
+  ["Lot 2","North bend",47.7535030,-122.0965776],
+  ["Lot 2","Cul-de-sac curve start",47.7536045,-122.0964145],
+  ["Lot 2","NE corner (cul-de-sac)",47.7535589,-122.0962911],
+  ["Lot 2","SE corner",47.7532338,-122.0963096],
+  ["Lot 2","SW corner",47.7531353,-122.0968535],
+  ["Lot 2","West bend",47.7533661,-122.0969480],
+  ["Lot 4","NW corner (at road)",47.7536483,-122.0957131],
+  ["Lot 4","Road curve change",47.7536229,-122.0953489],
+  ["Lot 4","NE corner (at road)",47.7534734,-122.0948813],
+  ["Lot 4","South corner",47.7531641,-122.0953730],
+  ["Lot 4","SW corner",47.7532092,-122.0957244],
+].map(([lot, name, lat, lon], i) => ({ id: i, lot, name, lat, lon }));
+
+const $ = id => document.getElementById(id);
+const toRad = d => d * Math.PI / 180;
+let me = null, accFt = null, heading = null;
+let targetId = null;
+try { const s = localStorage.getItem("target"); if (s !== null) targetId = +s; } catch {}
+
+function distFt(a, b) {
+  const R = 20902231; // earth radius in feet
+  const dLat = toRad(b.lat - a.lat), dLon = toRad(b.lon - a.lon);
+  const h = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function bearing(a, b) {
+  const y = Math.sin(toRad(b.lon - a.lon)) * Math.cos(toRad(b.lat));
+  const x = Math.cos(toRad(a.lat))*Math.sin(toRad(b.lat)) - Math.sin(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.cos(toRad(b.lon - a.lon));
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+const COMPASS = ["north","northeast","east","southeast","south","southwest","west","northwest"];
+const compassWord = deg => COMPASS[Math.round(deg / 45) % 8];
+const fmtFt = ft => ft >= 1000 ? (ft / 5280).toFixed(2) + " mi" : Math.round(ft) + " ft";
+
+function renderList() {
+  const lots = [...new Set(CORNERS.map(c => c.lot))];
+  let nearestId = null;
+  if (me) nearestId = CORNERS.reduce((best, c) => distFt(me, c) < distFt(me, best) ? c : best).id;
+  const html = lots.map(lot => {
+    let items = CORNERS.filter(c => c.lot === lot);
+    if (me) items = items.slice().sort((a, b) => distFt(me, a) - distFt(me, b));
+    return `<h2>${lot}</h2><div class="lot">` + items.map(c =>
+      `<button class="corner${c.id === targetId ? " selected" : ""}${c.id === nearestId ? " nearest" : ""}" data-id="${c.id}" type="button">
+        <span class="cn">${c.name}</span>
+        <span class="cd">${me ? fmtFt(distFt(me, c)) : ""}</span>
+      </button>`).join("") + `</div>`;
+  }).join("");
+  $("list").innerHTML = html;
+}
+
+function renderTarget() {
+  const t = CORNERS[targetId];
+  if (!t) { $("target").hidden = true; return; }
+  $("target").hidden = false;
+  $("tName").textContent = `${t.lot} · ${t.name}`;
+  $("tCoords").textContent = `${t.lat.toFixed(7)}, ${t.lon.toFixed(7)}`;
+  if (!me) { $("dist").textContent = "—"; $("dir").textContent = "Waiting for GPS…"; $("hint").textContent = ""; return; }
+  const d = distFt(me, t), b = bearing(me, t);
+  $("dist").textContent = fmtFt(d);
+  $("dir").textContent = `Walk ${compassWord(b)} (${Math.round(b)}°)`;
+  // Arrow points to the corner relative to the phone if compass is on, otherwise relative to north.
+  const rot = heading == null ? b : b - heading;
+  $("arrow").style.transform = `rotate(${rot}deg)`;
+  const close = Math.max(20, (accFt || 0));
+  const hint = $("hint");
+  if (d <= close) { hint.textContent = "You're there. Look around for the stake."; hint.className = "good"; }
+  else if (d <= 60) { hint.textContent = "Very close. Slow down."; hint.className = "ok"; }
+  else { hint.textContent = heading == null ? "Arrow shows the direction with north at the top of the screen." : "Arrow points toward the corner. Hold the phone flat."; hint.className = ""; }
+}
+
+function onPos(pos) {
+  const { latitude, longitude, accuracy } = pos.coords;
+  me = { lat: latitude, lon: longitude };
+  accFt = Math.round(accuracy * 3.28084);
+  $("lat").textContent = latitude.toFixed(6);
+  $("lon").textContent = longitude.toFixed(6);
+  const acc = $("acc");
+  acc.textContent = `Accuracy ± ${accFt} ft` + (accFt <= 16 ? " · good" : accFt <= 50 ? " · keep still" : " · rough, move into the open");
+  acc.className = accFt <= 16 ? "good" : accFt <= 50 ? "ok" : "bad";
+  renderList(); renderTarget();
+}
+function onErr(err) {
+  const acc = $("acc");
+  acc.className = "bad";
+  acc.textContent = err.code === 1
+    ? "Location is off for this page. Allow it in your phone's Settings, then reload."
+    : "Can't get a GPS fix yet. Move outside with a clear view of the sky.";
+}
+
+$("list").addEventListener("click", e => {
+  const btn = e.target.closest(".corner"); if (!btn) return;
+  targetId = +btn.dataset.id;
+  try { localStorage.setItem("target", targetId); } catch {}
+  renderList(); renderTarget();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+$("copy").addEventListener("click", async () => {
+  if (!me) { $("msg").textContent = "No position yet."; return; }
+  const txt = `${me.lat.toFixed(6)}, ${me.lon.toFixed(6)}`;
+  try { await navigator.clipboard.writeText(txt); $("msg").textContent = "Copied: " + txt; }
+  catch { $("msg").textContent = txt; }
+});
+
+// Compass: iPhone needs a tap to grant permission; Android just works.
+function onOrient(e) {
+  let h = null;
+  if (typeof e.webkitCompassHeading === "number") h = e.webkitCompassHeading;
+  else if (e.absolute && e.alpha != null) h = (360 - e.alpha) % 360;
+  if (h == null) return;
+  heading = h;
+  $("compassBtn").hidden = true;
+  renderTarget();
+}
+$("compassBtn").addEventListener("click", async () => {
+  try {
+    if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== "granted") { $("msg").textContent = "Compass permission was declined. Use the north-up arrow instead."; return; }
+    }
+    window.addEventListener("deviceorientationabsolute", onOrient);
+    window.addEventListener("deviceorientation", onOrient);
+    setTimeout(() => { if (heading == null) $("msg").textContent = "This phone isn't sharing a compass heading. The arrow stays north-up."; }, 3000);
+  } catch { $("msg").textContent = "Compass isn't available. The arrow stays north-up."; }
+});
+
+renderList(); renderTarget();
+if ("geolocation" in navigator) {
+  navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+} else onErr({ code: 2 });
+try { navigator.wakeLock && navigator.wakeLock.request("screen").catch(() => {}); } catch {}
+</script>
+</body>
+</html>
